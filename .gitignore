@@ -1,1 +1,7 @@
 my-upload-key.jks
+.env
+.env.local
+.gradle/
+build/
+app/build/
+local.properties
