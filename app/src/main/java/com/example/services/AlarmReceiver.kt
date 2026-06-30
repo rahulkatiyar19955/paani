@@ -50,8 +50,9 @@ class AlarmReceiver : BroadcastReceiver() {
             
             // Check DND / Silence Window
             if (isSilenceWindow(settings)) {
-                // Silently reschedule
-                AlarmScheduler.scheduleNextAlarm(context, settings.intervalMinutes)
+                // Silently reschedule to when the silence window ends (plus 1 minute buffer)
+                val minutesUntilEnd = getMinutesUntilSilenceWindowEnds(settings)
+                AlarmScheduler.scheduleNextAlarm(context, minutesUntilEnd)
                 return@launch
             }
 
@@ -88,6 +89,22 @@ class AlarmReceiver : BroadcastReceiver() {
             // crosses midnight
             currentMinutes >= startMinutes || currentMinutes <= endMinutes
         }
+    }
+
+    private fun getMinutesUntilSilenceWindowEnds(settings: com.example.data.WaterSettings): Int {
+        val cal = Calendar.getInstance()
+        val currentHour = cal.get(Calendar.HOUR_OF_DAY)
+        val currentMin = cal.get(Calendar.MINUTE)
+        val currentMinutes = currentHour * 60 + currentMin
+
+        val endMinutes = settings.nightModeEndHour * 60 + settings.nightModeEndMin
+
+        val diffMinutes = if (endMinutes > currentMinutes) {
+            endMinutes - currentMinutes
+        } else {
+            (24 * 60 - currentMinutes) + endMinutes
+        }
+        return diffMinutes + 1
     }
 
     private fun showNotification(context: Context) {

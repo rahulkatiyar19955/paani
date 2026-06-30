@@ -25,4 +25,10 @@ interface WaterDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun updateSettings(settings: WaterSettings)
+
+    @Query("SELECT SUM(amountMl) FROM water_records WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay")
+    suspend fun getTodayIntakeSync(startOfDay: Long, endOfDay: Long): Int?
+
+    @Query("DELETE FROM water_records WHERE id = :recordId")
+    suspend fun deleteRecordById(recordId: Int)
 }

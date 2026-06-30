@@ -50,33 +50,12 @@ class WaterTrackerViewModel(application: Application) : AndroidViewModel(applica
     fun addWater(amountMl: Int) {
         viewModelScope.launch {
             repository.addWater(amountMl)
-            
-            // Check gamification
-            val currentIntake = currentIntakeMl.value + amountMl
-            val currentSettings = settings.value
-            
-            if (currentIntake >= currentSettings.dailyGoalMl) {
-                // Determine start of day for last goal met
-                val calendar = Calendar.getInstance()
-                calendar.set(Calendar.HOUR_OF_DAY, 0)
-                calendar.set(Calendar.MINUTE, 0)
-                calendar.set(Calendar.SECOND, 0)
-                calendar.set(Calendar.MILLISECOND, 0)
-                val todayStart = calendar.timeInMillis
-                
-                if (currentSettings.lastGoalMetDate < todayStart) {
-                    // Goal hit for the first time today
-                    // Add streak and bonus points
-                    val streak = currentSettings.currentStreak + 1
-                    val newPoints = currentSettings.totalPoints + 50
-                    val updated = currentSettings.copy(
-                        currentStreak = streak,
-                        totalPoints = newPoints,
-                        lastGoalMetDate = todayStart
-                    )
-                    repository.updateSettings(updated)
-                }
-            }
+        }
+    }
+
+    fun deleteRecord(recordId: Int, amountMl: Int, timestamp: Long) {
+        viewModelScope.launch {
+            repository.deleteRecord(recordId, amountMl, timestamp)
         }
     }
 

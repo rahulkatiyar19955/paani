@@ -41,6 +41,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavHostController
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material.icons.filled.Delete
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WaterTrackerScreen(viewModel: WaterTrackerViewModel) {
@@ -55,20 +59,13 @@ fun WaterTrackerScreen(viewModel: WaterTrackerViewModel) {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
+                        Image(
+                            painter = painterResource(id = com.example.R.drawable.logo),
+                            contentDescription = "Paani Logo",
                             modifier = Modifier
                                 .size(32.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.WaterDrop,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "Paani",
@@ -261,6 +258,53 @@ fun WaterTrackerScreen(viewModel: WaterTrackerViewModel) {
                             onClick = { viewModel.addWater(750) }
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Text(
+                        "LOG CUSTOM AMOUNT",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier
+                            .align(Alignment.Start)
+                            .padding(start = 4.dp, bottom = 12.dp)
+                    )
+                    
+                    var customAmountStr by remember { mutableStateOf("") }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = customAmountStr,
+                            onValueChange = { customAmountStr = it.filter { char -> char.isDigit() } },
+                            label = { Text("Amount (ml)") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                        Button(
+                            onClick = {
+                                val amount = customAmountStr.toIntOrNull()
+                                if (amount != null && amount > 0) {
+                                    viewModel.addWater(amount)
+                                    customAmountStr = ""
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.height(56.dp)
+                        ) {
+                            Text("Log", fontWeight = FontWeight.Bold)
+                        }
+                    }
                     
                     Spacer(modifier = Modifier.height(48.dp))
                 }
@@ -351,6 +395,15 @@ fun WaterTrackerScreen(viewModel: WaterTrackerViewModel) {
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.deleteRecord(record.id, record.amountMl, record.timestamp) }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete record",
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
                                     }
                                 }
                             }
@@ -516,6 +569,9 @@ fun QuickLogCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConfigurationCard(settings: WaterSettings, onSettingsChanged: (WaterSettings) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val isCustomActive = !listOf(15, 30, 60).contains(settings.intervalMinutes)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -538,7 +594,7 @@ fun ConfigurationCard(settings: WaterSettings, onSettingsChanged: (WaterSettings
                     Text(
                         "Frequency of reminders",
                         fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant // slate-500
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -556,7 +612,7 @@ fun ConfigurationCard(settings: WaterSettings, onSettingsChanged: (WaterSettings
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 intervals.forEach { interval ->
-                    val isSelected = settings.intervalMinutes == interval || (interval == 0 && !listOf(15, 30, 60).contains(settings.intervalMinutes))
+                    val isSelected = (interval != 0 && settings.intervalMinutes == interval) || (interval == 0 && isCustomActive)
                     val text = if (interval == 0) "Custom" else if (interval == 60) "1h" else "${interval}m"
                     
                     Box(
@@ -564,7 +620,13 @@ fun ConfigurationCard(settings: WaterSettings, onSettingsChanged: (WaterSettings
                             .weight(1f)
                             .clip(CircleShape)
                             .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                            .clickable { if (interval != 0) onSettingsChanged(settings.copy(intervalMinutes = interval)) }
+                            .clickable {
+                                if (interval != 0) {
+                                    onSettingsChanged(settings.copy(intervalMinutes = interval))
+                                } else {
+                                    onSettingsChanged(settings.copy(intervalMinutes = 45)) // Default Custom to 45m
+                                }
+                            }
                             .padding(vertical = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -572,10 +634,36 @@ fun ConfigurationCard(settings: WaterSettings, onSettingsChanged: (WaterSettings
                             text,
                             fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant // slate-600
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
+            }
+            
+            if (isCustomActive) {
+                Spacer(modifier = Modifier.height(12.dp))
+                var customIntervalStr by remember(settings.intervalMinutes) { mutableStateOf(settings.intervalMinutes.toString()) }
+                OutlinedTextField(
+                    value = customIntervalStr,
+                    onValueChange = { newValue ->
+                        val filtered = newValue.filter { it.isDigit() }
+                        customIntervalStr = filtered
+                        val minutes = filtered.toIntOrNull()
+                        if (minutes != null && minutes > 0) {
+                            onSettingsChanged(settings.copy(intervalMinutes = minutes))
+                        }
+                    },
+                    label = { Text("Custom Interval (minutes)") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                    ),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                )
             }
             
             Spacer(modifier = Modifier.height(24.dp))
@@ -599,14 +687,59 @@ fun ConfigurationCard(settings: WaterSettings, onSettingsChanged: (WaterSettings
                         val minString = m.toString().padStart(2, '0')
                         "$hour12:$minString $amPm"
                     }
-                    val timeString = "${formatTime(settings.nightModeStartHour, settings.nightModeStartMin)} - ${formatTime(settings.nightModeEndHour, settings.nightModeEndMin)}"
                     
-                    Text(
-                        timeString,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            formatTime(settings.nightModeStartHour, settings.nightModeStartMin),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .clickable {
+                                    android.app.TimePickerDialog(
+                                        context,
+                                        { _, h, m ->
+                                            onSettingsChanged(settings.copy(nightModeStartHour = h, nightModeStartMin = m))
+                                        },
+                                        settings.nightModeStartHour,
+                                        settings.nightModeStartMin,
+                                        false
+                                    ).show()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                        Text(
+                            " to ",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            formatTime(settings.nightModeEndHour, settings.nightModeEndMin),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .clickable {
+                                    android.app.TimePickerDialog(
+                                        context,
+                                        { _, h, m ->
+                                            onSettingsChanged(settings.copy(nightModeEndHour = h, nightModeEndMin = m))
+                                        },
+                                        settings.nightModeEndHour,
+                                        settings.nightModeEndMin,
+                                        false
+                                    ).show()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
                 
                 Switch(
@@ -621,6 +754,37 @@ fun ConfigurationCard(settings: WaterSettings, onSettingsChanged: (WaterSettings
                     )
                 )
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                "Daily Goal (ml)",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            var goalStr by remember(settings.dailyGoalMl) { mutableStateOf(settings.dailyGoalMl.toString()) }
+            OutlinedTextField(
+                value = goalStr,
+                onValueChange = { newValue ->
+                    val filtered = newValue.filter { it.isDigit() }
+                    goalStr = filtered
+                    val amount = filtered.toIntOrNull()
+                    if (amount != null && amount > 0) {
+                        onSettingsChanged(settings.copy(dailyGoalMl = amount))
+                    }
+                },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                ),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            )
         }
     }
 }

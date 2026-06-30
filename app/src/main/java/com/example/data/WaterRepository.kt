@@ -24,16 +24,34 @@ class WaterRepository(private val waterDao: WaterDao) {
         // Update gamification points and streak
         val settings = waterDao.getSettingsSync() ?: WaterSettings()
         var newPoints = settings.totalPoints + 10 // 10 points per log
+        var currentStreak = settings.currentStreak
+        var lastGoalMetDate = settings.lastGoalMetDate
         
-        // Check if daily goal is hit
-        // Need to calculate current today's intake
-        // We'll calculate it in the view model, but for instant reward let's do a simple calculation here
-        // Actually, we can fetch today's records sync or just let the viewmodel handle it?
-        // Wait, a quick way to know is by querying records synchronously, but we don't have a sync query.
-        // Let's add gamification update here or in the VM.
-        // It's cleaner to handle this gamification via the ViewModel or a UseCase, but we'll do it simple:
+        // Calculate today's intake
+        val (start, end) = getStartAndEndOfDay()
+        val todayIntake = waterDao.getTodayIntakeSync(start, end) ?: 0
         
-        waterDao.updateSettings(settings.copy(totalPoints = newPoints))
+        if (todayIntake >= settings.dailyGoalMl) {
+            val calendar = Calendar.getInstance()
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            val todayStart = calendar.timeInMillis
+            
+            if (settings.lastGoalMetDate < todayStart) {
+                // Goal hit for the first time today
+                currentStreak += 1
+                newPoints += 50 // 50 points bonus
+                lastGoalMetDate = todayStart
+            }
+        }
+        
+        waterDao.updateSettings(settings.copy(
+            totalPoints = newPoints,
+            currentStreak = currentStreak,
+            lastGoalMetDate = lastGoalMetDate
+        ))
     }
     
     suspend fun updateSettings(settings: WaterSettings) {
@@ -42,6 +60,40 @@ class WaterRepository(private val waterDao: WaterDao) {
     
     suspend fun getSettingsSync(): WaterSettings {
         return waterDao.getSettingsSync() ?: WaterSettings()
+    }
+
+    suspend fun deleteRecord(recordId: Int, amountMl: Int, recordTimestamp: Long) {
+        waterDao.deleteRecordById(recordId)
+        
+        val settings = waterDao.getSettingsSync() ?: WaterSettings()
+        var newPoints = maxOf(0, settings.totalPoints - 10) // Deduct base points
+        var currentStreak = settings.currentStreak
+        var lastGoalMetDate = settings.lastGoalMetDate
+        
+        val (start, end) = getStartAndEndOfDay()
+        if (recordTimestamp in start..end) {
+            val todayIntake = waterDao.getTodayIntakeSync(start, end) ?: 0
+            if (todayIntake < settings.dailyGoalMl) {
+                val calendar = Calendar.getInstance()
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
+                val todayStart = calendar.timeInMillis
+                
+                if (settings.lastGoalMetDate == todayStart) {
+                    currentStreak = maxOf(0, currentStreak - 1)
+                    newPoints = maxOf(0, newPoints - 50) // Deduct bonus points
+                    lastGoalMetDate = 0L // Reset last goal met date
+                }
+            }
+        }
+        
+        waterDao.updateSettings(settings.copy(
+            totalPoints = newPoints,
+            currentStreak = currentStreak,
+            lastGoalMetDate = lastGoalMetDate
+        ))
     }
 
     private fun getStartAndEndOfDay(): Pair<Long, Long> {
