@@ -98,6 +98,14 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # ── Generate Gradle Wrapper if missing ───────────────────
+      - name: Generate Gradle Wrapper
+        run: |
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.11.1
+          fi
+          chmod +x gradlew
+
       # ── Gradle cache ──────────────────────────────────────────
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -133,7 +141,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add version.properties
-          git commit -m "chore: bump version to v${{ steps.version.outputs.version_name }}"
+          if git status --porcelain | grep -q "gradlew"; then
+            git add gradlew gradlew.bat gradle/wrapper/
+          fi
+          git commit -m "chore: bump version to v${{ steps.version.outputs.version_name }} & ensure wrapper" || echo "No changes to commit"
           git tag "v${{ steps.version.outputs.version_name }}"
 
           git push origin HEAD:main
