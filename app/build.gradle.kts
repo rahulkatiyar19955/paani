@@ -1,12 +1,13 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Properties
 
 // Read semver from version.properties
-val versionProps = java.util.Properties().apply {
+val versionProps = Properties().apply {
   load(rootProject.file("version.properties").inputStream())
 }
-val vMajor = versionProps["VERSION_MAJOR"].toString().toInt()
-val vMinor = versionProps["VERSION_MINOR"].toString().toInt()
-val vPatch = versionProps["VERSION_PATCH"].toString().toInt()
+val vMajor = versionProps.getProperty("VERSION_MAJOR").toInt()
+val vMinor = versionProps.getProperty("VERSION_MINOR").toInt()
+val vPatch = versionProps.getProperty("VERSION_PATCH").toInt()
 
 plugins {
   alias(libs.plugins.android.application)
