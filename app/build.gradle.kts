@@ -1,5 +1,13 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 
+// Read semver from version.properties
+val versionProps = java.util.Properties().apply {
+  load(rootProject.file("version.properties").inputStream())
+}
+val vMajor = versionProps["VERSION_MAJOR"].toString().toInt()
+val vMinor = versionProps["VERSION_MINOR"].toString().toInt()
+val vPatch = versionProps["VERSION_PATCH"].toString().toInt()
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -17,8 +25,8 @@ android {
     applicationId = "com.aistudio.waterreminder.xblqzw"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = vMajor * 10000 + vMinor * 100 + vPatch
+    versionName = "$vMajor.$vMinor.$vPatch"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
